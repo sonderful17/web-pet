@@ -505,6 +505,7 @@
     padding: 6px 4px;
     border-bottom: 1px solid #1a3a1a;
     font-size: 13px;
+    color: #33aa33;
   }
 
   .lb-row.lb-header {
@@ -544,8 +545,8 @@
   }
 
   .lb-dead-marker {
-    font-size: 10px;
-    color: #1a5a1a;
+    font-size: 11px;
+    color: #993333;
     margin-left: 4px;
   }
 
@@ -716,8 +717,8 @@ const STATUS_THRESHOLDS = [
 ];
 
 const EVOLUTION_STAGES = [
-  { name: 'ADULT', minDays: 7, minWeight: 20 },
-  { name: 'TEEN',  minDays: 3, minWeight: 10 },
+  { name: 'ADULT', minDays: 7, minWeight: 64 },
+  { name: 'TEEN',  minDays: 3, minWeight: 32 },
   { name: 'BABY',  minDays: 0, minWeight: 0 }
 ];
 
@@ -1195,7 +1196,7 @@ function getStage() {
   if (!pet) return 'BABY';
   const days = getDaysAlive();
   for (const stage of EVOLUTION_STAGES) {
-    if (days >= stage.minDays && pet.weight >= stage.minWeight) {
+    if (days >= stage.minDays || pet.weight >= stage.minWeight) {
       return stage.name;
     }
   }
@@ -1493,11 +1494,12 @@ async function renderLeaderboard(sortBy) {
   entries.slice(0, 8).forEach((entry, i) => {
     const isLive = entry.alive;
     const safeName = escapeHtml(entry.name);
+    const safeType = entry.type ? escapeHtml(entry.type).toUpperCase() : '';
     html += `<div class="lb-row ${isLive ? 'lb-live' : ''}">`;
     html += `<span class="lb-rank">${i + 1}</span>`;
-    html += `<span class="lb-name">${safeName}`;
+    html += `<span class="lb-name">${safeName}${safeType ? ' the ' + safeType : ''}`;
     if (isLive) html += ' <span class="lb-live-marker">[ALIVE]</span>';
-    else html += ' <span class="lb-dead-marker">[RIP]</span>';
+    else html += ' <span class="lb-dead-marker">[DEAD]</span>';
     html += '</span>';
     if (sortBy === 'weight') {
       html += `<span class="lb-value">${Number(entry.weight).toFixed(1)}g</span>`;
