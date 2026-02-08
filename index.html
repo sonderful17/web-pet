@@ -183,6 +183,7 @@
     display: none;
     flex-direction: column;
     flex: 1;
+    position: relative;
   }
 
   /* Info Panel */
@@ -430,6 +431,134 @@
   /* Hide screens */
   .hidden { display: none !important; }
   .flex { display: flex !important; }
+
+  /* Leaderboard Button Row */
+  .leaderboard-btn-row {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0 0 0;
+  }
+
+  /* Leaderboard Overlay */
+  #leaderboard-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .leaderboard-panel {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .leaderboard-title {
+    text-align: center;
+    font-size: 18px;
+    letter-spacing: 4px;
+    color: #33ff33;
+    text-shadow: 0 0 10px rgba(51, 255, 51, 0.8);
+    padding-bottom: 8px;
+    border-bottom: 2px double #1a5a1a;
+  }
+
+  .leaderboard-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .lb-tab {
+    min-width: 100px;
+    text-align: center;
+    font-size: 12px;
+    padding: 6px 16px;
+  }
+
+  .lb-tab.active {
+    background: #33ff33;
+    color: #000;
+    text-shadow: none;
+    box-shadow: 0 0 15px rgba(51, 255, 51, 0.5);
+  }
+
+  .leaderboard-list {
+    min-height: 180px;
+  }
+
+  .lb-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 4px;
+    border-bottom: 1px solid #1a3a1a;
+    font-size: 13px;
+  }
+
+  .lb-row.lb-header {
+    color: #1a5a1a;
+    font-size: 11px;
+    border-bottom: 1px solid #1a5a1a;
+  }
+
+  .lb-rank {
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .lb-name {
+    flex: 1;
+    padding: 0 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lb-value {
+    width: 70px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .lb-row.lb-live {
+    color: #66ff66;
+    text-shadow: 0 0 8px rgba(51, 255, 51, 0.6);
+  }
+
+  .lb-live-marker {
+    font-size: 11px;
+    color: #33ff33;
+  }
+
+  .lb-dead-marker {
+    font-size: 10px;
+    color: #1a5a1a;
+    margin-left: 4px;
+  }
+
+  .lb-empty {
+    text-align: center;
+    color: #1a5a1a;
+    padding: 30px 0;
+    font-size: 12px;
+  }
+
+  .lb-close {
+    align-self: center;
+    margin-top: 8px;
+  }
 </style>
 </head>
 <body>
@@ -440,7 +569,7 @@
     <!-- Naming Screen -->
     <div id="naming-screen">
       <div class="prompt">
-        INITIALIZING NEW PET UNIT...<br><br>
+        INITIALISING NEW PET UNIT...<br><br>
         ENTER DESIGNATION:<span class="cursor">_</span>
       </div>
       <input type="text" id="name-input" placeholder="NAME" maxlength="12" autocomplete="off" spellcheck="false">
@@ -510,6 +639,9 @@
         <button class="btn action-btn" id="btn-play" onclick="doAction('play')">[ PLAY ]</button>
         <button class="btn action-btn" id="btn-sleep" onclick="doAction('sleep')">[ SLEEP ]</button>
       </div>
+      <div class="leaderboard-btn-row">
+        <button class="btn" onclick="openLeaderboard()">[ LEADERBOARD ]</button>
+      </div>
     </div>
 
     <!-- Death Screen -->
@@ -519,15 +651,46 @@
       <div id="death-sprite"></div>
       <div class="death-stats" id="death-stats"></div>
       <button class="btn" onclick="resetPet()">[ NEW PET ]</button>
+      <button class="btn" onclick="openLeaderboard()">[ LEADERBOARD ]</button>
+    </div>
+  </div>
+
+  <!-- Leaderboard Overlay -->
+  <div id="leaderboard-overlay" class="hidden">
+    <div class="leaderboard-panel">
+      <div class="leaderboard-title">LEADERBOARD</div>
+      <div class="leaderboard-tabs">
+        <button class="btn lb-tab active" data-sort="days" onclick="switchLeaderboardTab('days')">[ DAYS ]</button>
+        <button class="btn lb-tab" data-sort="weight" onclick="switchLeaderboardTab('weight')">[ WEIGHT ]</button>
+      </div>
+      <div class="leaderboard-list" id="leaderboard-list"></div>
+      <button class="btn lb-close" onclick="closeLeaderboard()">[ CLOSE ]</button>
     </div>
   </div>
 </div>
+
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/12.9.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.9.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore-compat.js"></script>
 
 <script>
 // ============================================================
 // CONSTANTS
 // ============================================================
 const SAVE_KEY = 'webpet_save';
+const LEADERBOARD_KEY = 'webpet_leaderboard';
+
+// FIREBASE CONFIG — Replace with your Firebase project config
+// https://console.firebase.google.com → Project Settings → Your Apps → Web
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAIdyOh9-37f6_SykAL8w6Dz4wUerfrXfY",
+  authDomain: "web-pets-c2d1f.firebaseapp.com",
+  projectId: "web-pets-c2d1f",
+  storageBucket: "web-pets-c2d1f.firebasestorage.app",
+  messagingSenderId: "1004332017761",
+  appId: "1:1004332017761:web:33bf7faa0659e4f11fa220"
+};
 const DECAY_INTERVAL = 30000;        // 30s between stat ticks while open
 const AWAY_DECAY_RATE = 1 / 300;     // 1 point per 5 min (300s) while away
 const AWAY_STAT_FLOOR = 10;          // stats won't go below this from away-decay
@@ -769,6 +932,8 @@ let spriteTimer = null;
 let cooldowns = { feed: 0, play: 0, sleep: 0 };
 let cooldownTimers = {};
 let audioCtx = null;
+let db = null;
+let authUser = null;
 
 // ============================================================
 // AUDIO - Web Audio API sound effects
@@ -1039,6 +1204,10 @@ function checkDeath() {
     clearInterval(decayTimer);
     clearInterval(saveTimer);
     clearInterval(spriteTimer);
+    if (!pet.leaderboardSaved) {
+      saveToLeaderboard(pet);
+      pet.leaderboardSaved = true;
+    }
     savePet();
     showDeathScreen();
   }
@@ -1190,9 +1359,164 @@ function showDeathScreen() {
 }
 
 // ============================================================
+// LEADERBOARD
+// ============================================================
+function loadLeaderboard() {
+  const data = localStorage.getItem(LEADERBOARD_KEY);
+  if (!data) return [];
+  try { return JSON.parse(data); } catch { return []; }
+}
+
+function saveToLeaderboard(petData) {
+  const entry = {
+    name: petData.name,
+    type: petData.type,
+    days: Math.floor((Date.now() - petData.createdAt) / (1000 * 60 * 60 * 24)),
+    weight: petData.weight,
+    stage: getStage(),
+    date: Date.now()
+  };
+
+  // Always save locally as offline fallback
+  const lb = loadLeaderboard();
+  lb.push(entry);
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(lb));
+
+  // Save to Firestore if available
+  if (db && authUser) {
+    db.collection('leaderboard').add({
+      ...entry,
+      uid: authUser.uid,
+      date: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(err => {
+      console.warn('Failed to save to online leaderboard:', err);
+    });
+  }
+}
+
+function openLeaderboard() {
+  const overlay = document.getElementById('leaderboard-overlay');
+  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
+  switchLeaderboardTab('days');
+}
+
+function closeLeaderboard() {
+  const overlay = document.getElementById('leaderboard-overlay');
+  overlay.classList.add('hidden');
+  overlay.style.display = 'none';
+}
+
+function switchLeaderboardTab(sortBy) {
+  document.querySelectorAll('.lb-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.sort === sortBy);
+  });
+  renderLeaderboard(sortBy);
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+async function renderLeaderboard(sortBy) {
+  const list = document.getElementById('leaderboard-list');
+  list.innerHTML = '<div class="lb-empty">LOADING...</div>';
+
+  let entries = [];
+
+  // Try Firestore first, fall back to localStorage
+  try {
+    if (db) {
+      const field = sortBy === 'weight' ? 'weight' : 'days';
+      const snapshot = await db.collection('leaderboard')
+        .orderBy(field, 'desc')
+        .limit(8)
+        .get();
+      entries = snapshot.docs.map(doc => ({ ...doc.data(), alive: false }));
+    } else {
+      entries = loadLeaderboard().map(e => ({ ...e, alive: false }));
+    }
+  } catch (err) {
+    console.warn('Firestore fetch failed, using local data:', err);
+    entries = loadLeaderboard().map(e => ({ ...e, alive: false }));
+  }
+
+  // Include current live pet if it exists and isn't dead
+  if (pet && getStatus() !== 'DEAD') {
+    entries.push({
+      name: pet.name,
+      type: pet.type,
+      days: getDaysAlive(),
+      weight: pet.weight,
+      stage: getStage(),
+      alive: true
+    });
+  }
+
+  // Sort (re-sort after merging live pet)
+  if (sortBy === 'weight') {
+    entries.sort((a, b) => b.weight - a.weight);
+  } else {
+    entries.sort((a, b) => b.days - a.days);
+  }
+
+  if (entries.length === 0) {
+    list.innerHTML = '<div class="lb-empty">NO RECORDS YET</div>';
+    return;
+  }
+
+  let html = '<div class="lb-row lb-header">';
+  html += '<span class="lb-rank">#</span>';
+  html += '<span class="lb-name">NAME</span>';
+  html += `<span class="lb-value">${sortBy === 'weight' ? 'WEIGHT' : 'DAYS'}</span>`;
+  html += '</div>';
+
+  entries.slice(0, 8).forEach((entry, i) => {
+    const isLive = entry.alive;
+    const safeName = escapeHtml(entry.name);
+    html += `<div class="lb-row ${isLive ? 'lb-live' : ''}">`;
+    html += `<span class="lb-rank">${i + 1}</span>`;
+    html += `<span class="lb-name">${safeName}`;
+    if (isLive) html += ' <span class="lb-live-marker">[ALIVE]</span>';
+    else html += ' <span class="lb-dead-marker">[RIP]</span>';
+    html += '</span>';
+    if (sortBy === 'weight') {
+      html += `<span class="lb-value">${Number(entry.weight).toFixed(1)}g</span>`;
+    } else {
+      html += `<span class="lb-value">${Math.floor(entry.days)} day${entry.days !== 1 ? 's' : ''}</span>`;
+    }
+    html += '</div>';
+  });
+
+  list.innerHTML = html;
+}
+
+// ============================================================
+// FIREBASE
+// ============================================================
+function initFirebase() {
+  if (FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') return;
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    firebase.auth().signInAnonymously().then(cred => {
+      authUser = cred.user;
+    }).catch(err => {
+      console.warn('Anonymous auth failed:', err);
+    });
+  } catch (err) {
+    console.warn('Firebase init failed:', err);
+  }
+}
+
+// ============================================================
 // INITIALIZATION
 // ============================================================
 function init() {
+  initFirebase();
+
   const saved = loadPet();
   if (saved) {
     pet = saved;
