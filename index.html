@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WEB PET</title>
+<style>
+  @font-face {
+    font-family: 'Pixel';
+    src: local('Courier New'), local('Courier'), local('monospace');
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+  }
+
+  /* CRT Monitor Frame */
+  #monitor {
+    position: relative;
+    width: 480px;
+    background: #0a0a0a;
+    border: 4px solid #1a3a1a;
+    border-radius: 8px;
+    box-shadow:
+      0 0 20px rgba(0, 255, 0, 0.1),
+      inset 0 0 60px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+  }
+
+  /* CRT Scanline Overlay */
+  #monitor::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.15) 2px,
+      rgba(0, 0, 0, 0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* CRT Flicker */
+  @keyframes flicker {
+    0% { opacity: 0.97; }
+    5% { opacity: 0.95; }
+    10% { opacity: 0.98; }
+    50% { opacity: 0.96; }
+    100% { opacity: 0.97; }
+  }
+
+  #screen {
+    padding: 16px;
+    animation: flicker 0.15s infinite;
+    color: #33ff33;
+    font-size: 14px;
+    line-height: 1.4;
+    text-shadow: 0 0 5px rgba(51, 255, 51, 0.5);
+    min-height: 640px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Blinking cursor */
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+
+  .cursor {
+    display: inline-block;
+    animation: blink 1s step-end infinite;
+  }
+
+  .screen-section {
+    border-top: 2px solid #1a5a1a;
+    border-bottom: 2px solid #1a5a1a;
+    padding: 8px 0;
+    margin: 4px 0;
+  }
+
+  /* Title */
+  .title {
+    text-align: center;
+    font-size: 22px;
+    letter-spacing: 8px;
+    padding: 12px 0;
+    border-bottom: 2px double #1a5a1a;
+    text-shadow: 0 0 10px rgba(51, 255, 51, 0.8);
+  }
+
+  /* Naming Screen */
+  #naming-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 20px;
+  }
+
+  #naming-screen .prompt {
+    font-size: 14px;
+    text-align: center;
+  }
+
+  #name-input {
+    background: transparent;
+    border: 2px solid #33ff33;
+    color: #33ff33;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 18px;
+    padding: 8px 12px;
+    text-align: center;
+    outline: none;
+    width: 240px;
+    text-shadow: 0 0 5px rgba(51, 255, 51, 0.5);
+  }
+
+  #name-input::placeholder {
+    color: #1a5a1a;
+  }
+
+  #name-input:focus {
+    box-shadow: 0 0 10px rgba(51, 255, 51, 0.3);
+  }
+
+  .btn {
+    background: transparent;
+    border: 2px solid #33ff33;
+    color: #33ff33;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    padding: 8px 20px;
+    cursor: pointer;
+    text-shadow: 0 0 5px rgba(51, 255, 51, 0.5);
+    transition: all 0.1s;
+    position: relative;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: #33ff33;
+    color: #000;
+    text-shadow: none;
+    box-shadow: 0 0 15px rgba(51, 255, 51, 0.5);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  .btn:disabled {
+    border-color: #1a3a1a;
+    color: #1a3a1a;
+    cursor: not-allowed;
+    text-shadow: none;
+  }
+
+  .btn .cooldown-text {
+    font-size: 11px;
+  }
+
+  /* Game Screen */
+  #game-screen {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  /* Info Panel */
+  .info-panel {
+    padding: 8px 4px;
+  }
+
+  .info-panel .pet-name-line {
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+
+  .info-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 1px 0;
+  }
+
+  .status-display {
+    font-size: 15px;
+    font-weight: bold;
+    text-align: center;
+    padding: 4px 0;
+    letter-spacing: 3px;
+  }
+
+  .status-thriving { color: #33ff33; }
+  .status-alive { color: #33ff33; }
+  .status-surviving { color: #cccc33; text-shadow: 0 0 5px rgba(204, 204, 51, 0.5); }
+  .status-dying { color: #ff9933; text-shadow: 0 0 5px rgba(255, 153, 51, 0.5); }
+  .status-barely-alive { color: #ff3333; text-shadow: 0 0 5px rgba(255, 51, 51, 0.5); }
+  .status-dead { color: #660000; text-shadow: 0 0 5px rgba(102, 0, 0, 0.5); }
+
+  /* Pet Display Area */
+  .pet-area {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #pet-sprite {
+    position: relative;
+    transition: transform 0.3s;
+  }
+
+  /* Animation classes */
+  @keyframes chomp {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.1, 0.9); }
+    50% { transform: scale(0.9, 1.1); }
+    75% { transform: scale(1.05, 0.95); }
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    25% { transform: translateY(-20px); }
+    50% { transform: translateY(0); }
+    75% { transform: translateY(-12px); }
+  }
+
+  @keyframes sleepSink {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(8px); }
+  }
+
+  .anim-feed { animation: chomp 0.25s ease-in-out 4; }
+  .anim-play { animation: bounce 0.375s ease-in-out 4; }
+  .anim-sleep { animation: sleepSink 2s ease-in-out forwards; }
+
+  /* Floating food pixel */
+  @keyframes foodDrop {
+    0% { transform: translateY(-60px); opacity: 1; }
+    80% { transform: translateY(0px); opacity: 1; }
+    100% { transform: translateY(0px); opacity: 0; }
+  }
+
+  .food-particle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #33ff33;
+    box-shadow:
+      6px 0 0 #33ff33,
+      0 6px 0 #33ff33,
+      6px 6px 0 #33ff33,
+      12px 0 0 #33ff33,
+      12px 6px 0 #33ff33;
+    animation: foodDrop 1s ease-in forwards;
+    z-index: 10;
+  }
+
+  /* Sparkle for play */
+  @keyframes sparkle {
+    0% { transform: scale(0) rotate(0deg); opacity: 1; }
+    50% { transform: scale(1) rotate(180deg); opacity: 1; }
+    100% { transform: scale(0) rotate(360deg); opacity: 0; }
+  }
+
+  .sparkle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #33ff33;
+    box-shadow:
+      -4px 0 0 #33ff33,
+      4px 0 0 #33ff33,
+      0 -4px 0 #33ff33,
+      0 4px 0 #33ff33;
+    animation: sparkle 0.75s ease-out forwards;
+    z-index: 10;
+  }
+
+  /* Sleep Z's */
+  @keyframes floatZ {
+    0% { transform: translateY(0) translateX(0); opacity: 1; }
+    100% { transform: translateY(-50px) translateX(15px); opacity: 0; }
+  }
+
+  .sleep-z {
+    position: absolute;
+    font-size: 16px;
+    color: #33ff33;
+    text-shadow: 0 0 5px rgba(51, 255, 51, 0.5);
+    animation: floatZ 2s ease-out forwards;
+    z-index: 10;
+    font-family: 'Courier New', Courier, monospace;
+  }
+
+  /* Stat Bars */
+  .stats-panel {
+    padding: 8px 4px;
+  }
+
+  .stat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 13px;
+  }
+
+  .stat-label {
+    width: 32px;
+    flex-shrink: 0;
+  }
+
+  .stat-bar-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 13px;
+  }
+
+  .stat-bar {
+    display: flex;
+    gap: 1px;
+  }
+
+  .stat-block {
+    width: 8px;
+    height: 12px;
+    border: 1px solid #1a3a1a;
+  }
+
+  .stat-block.filled {
+    background: #33ff33;
+    border-color: #33ff33;
+    box-shadow: 0 0 3px rgba(51, 255, 51, 0.3);
+  }
+
+  .stat-block.empty {
+    background: transparent;
+  }
+
+  .stat-value {
+    width: 30px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Action Buttons */
+  .actions-panel {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 2px solid #1a5a1a;
+    margin-top: auto;
+  }
+
+  .action-btn {
+    min-width: 100px;
+    text-align: center;
+  }
+
+  /* Death Screen */
+  #death-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 16px;
+  }
+
+  .death-text {
+    font-size: 20px;
+    color: #660000;
+    text-shadow: 0 0 10px rgba(102, 0, 0, 0.5);
+    letter-spacing: 4px;
+  }
+
+  .death-name {
+    font-size: 16px;
+    color: #993333;
+  }
+
+  .death-stats {
+    font-size: 12px;
+    color: #1a5a1a;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  /* Idle breathing animation */
+  @keyframes breathe {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+
+  .idle-anim {
+    animation: breathe 2s ease-in-out infinite;
+  }
+
+  /* Pixel art sprite rendering */
+  .pixel-sprite {
+    image-rendering: pixelated;
+  }
+
+  /* Hide screens */
+  .hidden { display: none !important; }
+  .flex { display: flex !important; }
+</style>
+</head>
+<body>
+<div id="monitor">
+  <div id="screen">
+    <div class="title">W E B &nbsp; P E T</div>
+
+    <!-- Naming Screen -->
+    <div id="naming-screen">
+      <div class="prompt">
+        INITIALIZING NEW PET UNIT...<br><br>
+        ENTER DESIGNATION:<span class="cursor">_</span>
+      </div>
+      <input type="text" id="name-input" placeholder="NAME" maxlength="12" autocomplete="off" spellcheck="false">
+      <button class="btn" id="name-submit" onclick="createPet()">[ ACTIVATE ]</button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen">
+      <div class="info-panel screen-section">
+        <div class="pet-name-line" id="pet-name-line"></div>
+        <div class="info-line">
+          <span id="stage-display"></span>
+          <span id="day-display"></span>
+        </div>
+        <div class="info-line">
+          <span id="weight-display"></span>
+          <span id="type-display"></span>
+        </div>
+        <div class="status-display" id="status-display"></div>
+      </div>
+
+      <div class="pet-area screen-section" id="pet-area">
+        <div id="pet-sprite" class="idle-anim"></div>
+      </div>
+
+      <div class="stats-panel screen-section">
+        <div class="stat-row">
+          <span class="stat-label">HNG</span>
+          <div class="stat-bar-container">
+            <span>[</span>
+            <div class="stat-bar" id="bar-hunger"></div>
+            <span>]</span>
+          </div>
+          <span class="stat-value" id="val-hunger"></span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">HPY</span>
+          <div class="stat-bar-container">
+            <span>[</span>
+            <div class="stat-bar" id="bar-happiness"></div>
+            <span>]</span>
+          </div>
+          <span class="stat-value" id="val-happiness"></span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">HLT</span>
+          <div class="stat-bar-container">
+            <span>[</span>
+            <div class="stat-bar" id="bar-health"></div>
+            <span>]</span>
+          </div>
+          <span class="stat-value" id="val-health"></span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">NRG</span>
+          <div class="stat-bar-container">
+            <span>[</span>
+            <div class="stat-bar" id="bar-energy"></div>
+            <span>]</span>
+          </div>
+          <span class="stat-value" id="val-energy"></span>
+        </div>
+      </div>
+
+      <div class="actions-panel">
+        <button class="btn action-btn" id="btn-feed" onclick="doAction('feed')">[ FEED ]</button>
+        <button class="btn action-btn" id="btn-play" onclick="doAction('play')">[ PLAY ]</button>
+        <button class="btn action-btn" id="btn-sleep" onclick="doAction('sleep')">[ SLEEP ]</button>
+      </div>
+    </div>
+
+    <!-- Death Screen -->
+    <div id="death-screen">
+      <div class="death-text">R . I . P .</div>
+      <div class="death-name" id="death-name"></div>
+      <div id="death-sprite"></div>
+      <div class="death-stats" id="death-stats"></div>
+      <button class="btn" onclick="resetPet()">[ NEW PET ]</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const SAVE_KEY = 'webpet_save';
+const DECAY_INTERVAL = 30000;        // 30s between stat ticks while open
+const AWAY_DECAY_RATE = 1 / 300;     // 1 point per 5 min (300s) while away
+const AWAY_STAT_FLOOR = 10;          // stats won't go below this from away-decay
+const AUTOSAVE_INTERVAL = 10000;     // save every 10s
+const PIXEL_SIZE = 6;                // size of each pixel in sprites
+
+const COOLDOWNS = { feed: 15000, play: 25000, sleep: 50000 };
+
+const ACTION_EFFECTS = {
+  feed:  { hunger: 20, happiness: 5,  health: 5,  energy: 5,  weight: 0.5 },
+  play:  { hunger: -10, happiness: 25, health: 10, energy: -15, weight: -0.3 },
+  sleep: { hunger: -5,  happiness: 5,  health: 15, energy: 30,  weight: 0.1 }
+};
+
+const STATUS_THRESHOLDS = [
+  { min: 80, label: 'THRIVING',     cls: 'status-thriving' },
+  { min: 60, label: 'ALIVE',        cls: 'status-alive' },
+  { min: 40, label: 'SURVIVING',    cls: 'status-surviving' },
+  { min: 20, label: 'DYING',        cls: 'status-dying' },
+  { min: 5,  label: 'BARELY ALIVE', cls: 'status-barely-alive' },
+  { min: 0,  label: 'DEAD',         cls: 'status-dead' }
+];
+
+const EVOLUTION_STAGES = [
+  { name: 'ADULT', minDays: 7, minWeight: 20 },
+  { name: 'TEEN',  minDays: 3, minWeight: 10 },
+  { name: 'BABY',  minDays: 0, minWeight: 0 }
+];
+
+// ============================================================
+// SPRITE DATA - Pixel art defined as [x, y] coordinate arrays
+// Each coordinate represents one filled pixel
+// ============================================================
+const SPRITES = {
+  blob: {
+    baby: {
+      frames: [
+        // Frame 1
+        [
+          [2,0],[3,0],
+          [1,1],[2,1],[3,1],[4,1],
+          [0,2],[1,2],[2,2],[3,2],[4,2],[5,2],
+          [0,3],[1,3],[2,3],[3,3],[4,3],[5,3],
+          [1,4],[2,4],[3,4],[4,4],
+          [2,5],[3,5]
+        ],
+        // Frame 2 (slightly squished)
+        [
+          [1,0],[2,0],[3,0],[4,0],
+          [0,1],[1,1],[2,1],[3,1],[4,1],[5,1],
+          [0,2],[1,2],[2,2],[3,2],[4,2],[5,2],
+          [0,3],[1,3],[2,3],[3,3],[4,3],[5,3],
+          [1,4],[2,4],[3,4],[4,4],
+        ]
+      ],
+      eyes: [[1,2],[4,2]],
+      w: 6, h: 6
+    },
+    teen: {
+      frames: [
+        [
+          [3,0],[4,0],[5,0],
+          [2,1],[3,1],[4,1],[5,1],[6,1],
+          [1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[7,2],
+          [0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
+          [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],
+          [1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],
+          [2,6],[3,6],[4,6],[5,6],[6,6],
+          [3,7],[4,7],[5,7]
+        ],
+        [
+          [3,0],[4,0],[5,0],
+          [2,1],[3,1],[4,1],[5,1],[6,1],
+          [1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[7,2],
+          [0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],
+          [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],
+          [0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],
+          [2,6],[3,6],[4,6],[5,6],[6,6],
+          [3,7],[5,7]
+        ]
+      ],
+      eyes: [[2,3],[6,3]],
+      mouth: [[3,5],[4,5],[5,5]],
+      w: 9, h: 8
+    },
+    adult: {
+      frames: [
+        [
+          [4,0],[5,0],[6,0],[7,0],
+          [3,1],[4,1],[5,1],[6,1],[7,1],[8,1],
+          [2,2],[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[9,2],
+          [1,3],[2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],[10,3],
+          [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],[11,4],
+          [0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],[11,5],
+          [0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],[10,6],[11,6],
+          [1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],
+          [2,8],[3,8],[4,8],[5,8],[6,8],[7,8],[8,8],[9,8],
+          [3,9],[4,9],[5,9],[6,9],[7,9],[8,9],
+          [4,10],[5,10],[6,10],[7,10],
+          // arms
+          [-1,4],[-1,5],[12,4],[12,5]
+        ],
+        [
+          [4,0],[5,0],[6,0],[7,0],
+          [3,1],[4,1],[5,1],[6,1],[7,1],[8,1],
+          [2,2],[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[9,2],
+          [1,3],[2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],[10,3],
+          [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],[11,4],
+          [0,5],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],[11,5],
+          [0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],[10,6],[11,6],
+          [0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],
+          [2,8],[3,8],[4,8],[5,8],[6,8],[7,8],[8,8],[9,8],
+          [4,9],[5,9],[6,9],[7,9],
+          // arms up
+          [-1,3],[-1,4],[12,3],[12,4]
+        ]
+      ],
+      eyes: [[3,4],[8,4]],
+      mouth: [[4,6],[5,6],[6,6],[7,6]],
+      w: 13, h: 11
+    }
+  },
+  bug: {
+    baby: {
+      frames: [
+        [
+          // antennae
+          [1,0],[3,0],
+          // head
+          [1,1],[2,1],[3,1],
+          // body
+          [0,2],[1,2],[2,2],[3,2],[4,2],
+          [1,3],[2,3],[3,3],
+          // legs
+          [0,3],[4,3]
+        ],
+        [
+          [0,0],[4,0],
+          [1,1],[2,1],[3,1],
+          [0,2],[1,2],[2,2],[3,2],[4,2],
+          [1,3],[2,3],[3,3],
+          [0,4],[4,4]
+        ]
+      ],
+      eyes: [[1,1],[3,1]],
+      w: 5, h: 5
+    },
+    teen: {
+      frames: [
+        [
+          // antennae
+          [1,0],[6,0],
+          [2,1],[5,1],
+          // head
+          [2,2],[3,2],[4,2],[5,2],
+          // body
+          [1,3],[2,3],[3,3],[4,3],[5,3],[6,3],
+          [1,4],[2,4],[3,4],[4,4],[5,4],[6,4],
+          [2,5],[3,5],[4,5],[5,5],
+          // legs
+          [0,3],[7,3],
+          [0,5],[7,5]
+        ],
+        [
+          [0,0],[7,0],
+          [1,1],[6,1],
+          [2,2],[3,2],[4,2],[5,2],
+          [1,3],[2,3],[3,3],[4,3],[5,3],[6,3],
+          [1,4],[2,4],[3,4],[4,4],[5,4],[6,4],
+          [2,5],[3,5],[4,5],[5,5],
+          [0,4],[7,4],
+          [0,6],[7,6]
+        ]
+      ],
+      eyes: [[3,2],[4,2]],
+      w: 8, h: 7
+    },
+    adult: {
+      frames: [
+        [
+          // antennae
+          [2,0],[9,0],
+          [3,1],[8,1],
+          // head
+          [3,2],[4,2],[5,2],[6,2],[7,2],[8,2],
+          // thorax
+          [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],
+          // abdomen
+          [1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],
+          [1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],
+          [2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],
+          [3,7],[4,7],[5,7],[6,7],[7,7],[8,7],
+          [4,8],[5,8],[6,8],[7,8],
+          // legs
+          [0,3],[11,3],
+          [0,5],[11,5],
+          [1,7],[10,7],
+          // wings
+          [-1,3],[0,4],[12,3],[11,4]
+        ],
+        [
+          [1,0],[10,0],
+          [2,1],[9,1],
+          [3,2],[4,2],[5,2],[6,2],[7,2],[8,2],
+          [2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],
+          [1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],
+          [1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],
+          [2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],
+          [3,7],[4,7],[5,7],[6,7],[7,7],[8,7],
+          [4,8],[5,8],[6,8],[7,8],
+          // legs shifted
+          [0,4],[11,4],
+          [0,6],[11,6],
+          [2,8],[9,8],
+          // wings up
+          [-1,2],[0,3],[12,2],[11,3]
+        ]
+      ],
+      eyes: [[4,2],[7,2]],
+      w: 13, h: 9
+    }
+  }
+};
+
+// Dead sprite overlay (X_X face replacement for eyes)
+const DEAD_EYES_PATTERN = {
+  // Relative to each eye position: small X pattern
+  offsets: [[-1,-1],[1,-1],[-1,1],[1,1],[0,0]]
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let pet = null;
+let decayTimer = null;
+let saveTimer = null;
+let spriteFrame = 0;
+let spriteTimer = null;
+let cooldowns = { feed: 0, play: 0, sleep: 0 };
+let cooldownTimers = {};
+let audioCtx = null;
+
+// ============================================================
+// AUDIO - Web Audio API sound effects
+// ============================================================
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function playFeedSound() {
+  const ctx = getAudioCtx();
+  // Two quick "nom nom" square wave blips
+  [0, 0.15].forEach((delay, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(200 + i * 80, ctx.currentTime + delay);
+    osc.frequency.linearRampToValueAtTime(350 + i * 80, ctx.currentTime + delay + 0.08);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime + delay);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + 0.1);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime + delay);
+    osc.stop(ctx.currentTime + delay + 0.12);
+  });
+}
+
+function playPlaySound() {
+  const ctx = getAudioCtx();
+  // Cheerful ascending arpeggio - 4 triangle wave notes
+  const notes = [330, 415, 495, 660];
+  notes.forEach((freq, i) => {
+    const delay = i * 0.1;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime + delay);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime + delay);
+    osc.stop(ctx.currentTime + delay + 0.18);
+  });
+}
+
+function playSleepSound() {
+  const ctx = getAudioCtx();
+  // Soft descending sine wave sweep
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(400, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 1.5);
+  gain.gain.setValueAtTime(0.12, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 1.6);
+}
+
+const ACTION_SOUNDS = { feed: playFeedSound, play: playPlaySound, sleep: playSleepSound };
+
+// ============================================================
+// PERSISTENCE
+// ============================================================
+function savePet() {
+  if (!pet) return;
+  pet.lastVisit = Date.now();
+  localStorage.setItem(SAVE_KEY, JSON.stringify(pet));
+}
+
+function loadPet() {
+  const data = localStorage.getItem(SAVE_KEY);
+  if (!data) return null;
+  try { return JSON.parse(data); } catch { return null; }
+}
+
+function resetPet() {
+  localStorage.removeItem(SAVE_KEY);
+  pet = null;
+  clearInterval(decayTimer);
+  clearInterval(saveTimer);
+  clearInterval(spriteTimer);
+  Object.values(cooldownTimers).forEach(clearInterval);
+  showScreen('naming');
+}
+
+// ============================================================
+// GAME LOGIC
+// ============================================================
+function createPet() {
+  const nameInput = document.getElementById('name-input');
+  const name = nameInput.value.trim();
+  if (!name) return;
+
+  pet = {
+    name: name.toUpperCase(),
+    type: Math.random() < 0.5 ? 'blob' : 'bug',
+    createdAt: Date.now(),
+    lastVisit: Date.now(),
+    weight: Math.round((5 + Math.random() * 10) * 10) / 10,
+    stats: { hunger: 90, happiness: 90, health: 90, energy: 90 }
+  };
+
+  savePet();
+  startGame();
+}
+
+function startGame() {
+  applyAwayDecay();
+  showScreen('game');
+  updateDisplay();
+  startSprite();
+
+  decayTimer = setInterval(() => {
+    if (getStatus() === 'DEAD') return;
+    pet.stats.hunger = Math.max(0, pet.stats.hunger - 1);
+    pet.stats.happiness = Math.max(0, pet.stats.happiness - 0.8);
+    pet.stats.health = Math.max(0, pet.stats.health - 0.5);
+    pet.stats.energy = Math.max(0, pet.stats.energy - 1.2);
+    updateDisplay();
+    checkDeath();
+  }, DECAY_INTERVAL);
+
+  saveTimer = setInterval(savePet, AUTOSAVE_INTERVAL);
+}
+
+function applyAwayDecay() {
+  if (!pet || !pet.lastVisit) return;
+  const elapsed = (Date.now() - pet.lastVisit) / 1000; // seconds
+  if (elapsed < 60) return; // ignore if less than a minute
+
+  const decay = elapsed * AWAY_DECAY_RATE;
+
+  for (const stat of Object.keys(pet.stats)) {
+    pet.stats[stat] = Math.max(AWAY_STAT_FLOOR, pet.stats[stat] - decay);
+  }
+  savePet();
+}
+
+function doAction(action) {
+  if (!pet || getStatus() === 'DEAD') return;
+  if (cooldowns[action] > 0) return;
+
+  const effects = ACTION_EFFECTS[action];
+  pet.stats.hunger = clamp(pet.stats.hunger + effects.hunger, 0, 100);
+  pet.stats.happiness = clamp(pet.stats.happiness + effects.happiness, 0, 100);
+  pet.stats.health = clamp(pet.stats.health + effects.health, 0, 100);
+  pet.stats.energy = clamp(pet.stats.energy + effects.energy, 0, 100);
+  pet.weight = Math.max(1, Math.round((pet.weight + effects.weight) * 10) / 10);
+
+  // Play sound
+  ACTION_SOUNDS[action]();
+
+  // Trigger animation
+  triggerAnimation(action);
+
+  // Start cooldown
+  startCooldown(action);
+
+  savePet();
+  updateDisplay();
+  checkDeath();
+}
+
+function triggerAnimation(action) {
+  const sprite = document.getElementById('pet-sprite');
+  const area = document.getElementById('pet-area');
+
+  // Remove idle animation during action animation
+  sprite.classList.remove('idle-anim');
+  sprite.classList.remove('anim-feed', 'anim-play', 'anim-sleep');
+
+  // Force reflow
+  void sprite.offsetWidth;
+
+  if (action === 'feed') {
+    sprite.classList.add('anim-feed');
+    // Spawn food particle
+    const food = document.createElement('div');
+    food.className = 'food-particle';
+    food.style.left = (area.offsetWidth / 2 - 6) + 'px';
+    food.style.top = '20px';
+    area.appendChild(food);
+    setTimeout(() => { food.remove(); }, 1000);
+    setTimeout(() => { sprite.classList.remove('anim-feed'); sprite.classList.add('idle-anim'); }, 1000);
+  }
+
+  if (action === 'play') {
+    sprite.classList.add('anim-play');
+    setTimeout(() => { sprite.classList.remove('anim-play'); sprite.classList.add('idle-anim'); }, 1500);
+  }
+
+  if (action === 'sleep') {
+    sprite.classList.add('anim-sleep');
+    setTimeout(() => { sprite.classList.remove('anim-sleep'); sprite.classList.add('idle-anim'); }, 2000);
+  }
+}
+
+function startCooldown(action) {
+  const duration = COOLDOWNS[action];
+  cooldowns[action] = duration;
+  const btn = document.getElementById('btn-' + action);
+  const label = action.toUpperCase();
+
+  // Clear existing timer if any
+  if (cooldownTimers[action]) clearInterval(cooldownTimers[action]);
+
+  const updateBtn = () => {
+    if (cooldowns[action] <= 0) {
+      cooldowns[action] = 0;
+      btn.disabled = false;
+      btn.innerHTML = `[ ${label} ]`;
+      clearInterval(cooldownTimers[action]);
+      return;
+    }
+    btn.disabled = true;
+    const secs = Math.ceil(cooldowns[action] / 1000);
+    btn.innerHTML = `[ ${label} ]<br><span class="cooldown-text">${secs}s</span>`;
+  };
+
+  updateBtn();
+  cooldownTimers[action] = setInterval(() => {
+    cooldowns[action] -= 1000;
+    updateBtn();
+  }, 1000);
+}
+
+function getStatus() {
+  if (!pet) return 'DEAD';
+  const avg = (pet.stats.hunger + pet.stats.happiness + pet.stats.health + pet.stats.energy) / 4;
+  for (const t of STATUS_THRESHOLDS) {
+    if (avg >= t.min) return t.label;
+  }
+  return 'DEAD';
+}
+
+function getStatusClass() {
+  const status = getStatus();
+  for (const t of STATUS_THRESHOLDS) {
+    if (t.label === status) return t.cls;
+  }
+  return 'status-dead';
+}
+
+function getStage() {
+  if (!pet) return 'BABY';
+  const days = getDaysAlive();
+  for (const stage of EVOLUTION_STAGES) {
+    if (days >= stage.minDays && pet.weight >= stage.minWeight) {
+      return stage.name;
+    }
+  }
+  return 'BABY';
+}
+
+function getDaysAlive() {
+  if (!pet) return 0;
+  return Math.floor((Date.now() - pet.createdAt) / (1000 * 60 * 60 * 24));
+}
+
+function checkDeath() {
+  if (getStatus() === 'DEAD') {
+    clearInterval(decayTimer);
+    clearInterval(saveTimer);
+    clearInterval(spriteTimer);
+    savePet();
+    showDeathScreen();
+  }
+}
+
+function clamp(val, min, max) {
+  return Math.max(min, Math.min(max, val));
+}
+
+// ============================================================
+// DISPLAY
+// ============================================================
+function showScreen(screen) {
+  document.getElementById('naming-screen').classList.add('hidden');
+  document.getElementById('game-screen').classList.add('hidden');
+  document.getElementById('game-screen').style.display = 'none';
+  document.getElementById('death-screen').classList.add('hidden');
+  document.getElementById('death-screen').style.display = 'none';
+
+  if (screen === 'naming') {
+    document.getElementById('naming-screen').classList.remove('hidden');
+    document.getElementById('naming-screen').style.display = 'flex';
+  } else if (screen === 'game') {
+    document.getElementById('game-screen').classList.remove('hidden');
+    document.getElementById('game-screen').style.display = 'flex';
+  } else if (screen === 'death') {
+    document.getElementById('death-screen').classList.remove('hidden');
+    document.getElementById('death-screen').style.display = 'flex';
+  }
+}
+
+function updateDisplay() {
+  if (!pet) return;
+
+  // Info panel
+  document.getElementById('pet-name-line').textContent = `${pet.name} the ${pet.type.toUpperCase()}`;
+  document.getElementById('stage-display').textContent = `Stage: ${getStage()}`;
+  document.getElementById('day-display').textContent = `Day: ${getDaysAlive()}`;
+  document.getElementById('weight-display').textContent = `Weight: ${pet.weight.toFixed(1)}g`;
+  document.getElementById('type-display').textContent = `Type: ${pet.type.toUpperCase()}`;
+
+  // Status
+  const statusEl = document.getElementById('status-display');
+  statusEl.textContent = `[ ${getStatus()} ]`;
+  statusEl.className = 'status-display ' + getStatusClass();
+
+  // Stat bars
+  updateStatBar('hunger', pet.stats.hunger);
+  updateStatBar('happiness', pet.stats.happiness);
+  updateStatBar('health', pet.stats.health);
+  updateStatBar('energy', pet.stats.energy);
+
+  // Update sprite
+  renderSprite();
+}
+
+function updateStatBar(stat, value) {
+  const bar = document.getElementById('bar-' + stat);
+  const val = document.getElementById('val-' + stat);
+  const blocks = 10;
+  const filled = Math.round(value / 10);
+
+  let html = '';
+  for (let i = 0; i < blocks; i++) {
+    html += `<div class="stat-block ${i < filled ? 'filled' : 'empty'}"></div>`;
+  }
+  bar.innerHTML = html;
+  val.textContent = Math.round(value);
+}
+
+// ============================================================
+// SPRITE RENDERING
+// ============================================================
+function renderSprite(dead) {
+  if (!pet) return;
+
+  const stage = getStage().toLowerCase();
+  const spriteData = SPRITES[pet.type][stage];
+  if (!spriteData) return;
+
+  const frame = spriteData.frames[spriteFrame % spriteData.frames.length];
+  const container = dead ? document.getElementById('death-sprite') : document.getElementById('pet-sprite');
+
+  // Build box-shadow string
+  const shadows = [];
+  const color = dead ? '#660000' : '#33ff33';
+  const eyeColor = dead ? '#330000' : '#000';
+
+  // Get eyes and mouth positions for this sprite
+  const eyeSet = new Set((spriteData.eyes || []).map(p => p[0] + ',' + p[1]));
+  const mouthSet = new Set((spriteData.mouth || []).map(p => p[0] + ',' + p[1]));
+
+  for (const [x, y] of frame) {
+    const key = x + ',' + y;
+    let c = color;
+    if (eyeSet.has(key)) {
+      if (dead) {
+        // Draw X pattern for dead eyes
+        c = '#330000';
+      } else {
+        c = eyeColor;
+      }
+    } else if (mouthSet.has(key)) {
+      c = dead ? '#330000' : '#005500';
+    }
+    shadows.push(`${x * PIXEL_SIZE}px ${y * PIXEL_SIZE}px 0 0 ${c}`);
+  }
+
+  // For dead eyes, add X overlay
+  if (dead && spriteData.eyes) {
+    for (const [ex, ey] of spriteData.eyes) {
+      for (const [dx, dy] of DEAD_EYES_PATTERN.offsets) {
+        const nx = ex + dx;
+        const ny = ey + dy;
+        if (nx >= 0 && ny >= 0) {
+          shadows.push(`${nx * PIXEL_SIZE}px ${ny * PIXEL_SIZE}px 0 0 #ff0000`);
+        }
+      }
+    }
+  }
+
+  container.style.width = PIXEL_SIZE + 'px';
+  container.style.height = PIXEL_SIZE + 'px';
+  container.style.boxShadow = shadows.join(', ');
+  container.style.marginLeft = ((spriteData.w * PIXEL_SIZE) / 2) + 'px';
+  container.style.marginTop = '20px';
+  container.style.marginBottom = ((spriteData.h * PIXEL_SIZE) + 20) + 'px';
+}
+
+function startSprite() {
+  spriteFrame = 0;
+  if (spriteTimer) clearInterval(spriteTimer);
+  spriteTimer = setInterval(() => {
+    spriteFrame = (spriteFrame + 1) % 2;
+    if (pet && getStatus() !== 'DEAD') {
+      renderSprite();
+    }
+  }, 800);
+}
+
+function showDeathScreen() {
+  showScreen('death');
+  document.getElementById('death-name').textContent = `${pet.name} the ${pet.type.toUpperCase()}`;
+  document.getElementById('death-stats').innerHTML =
+    `Lived for ${getDaysAlive()} days<br>` +
+    `Final weight: ${pet.weight.toFixed(1)}g<br>` +
+    `Stage reached: ${getStage()}`;
+  renderSprite(true);
+}
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+function init() {
+  const saved = loadPet();
+  if (saved) {
+    pet = saved;
+    if (getStatus() === 'DEAD') {
+      showDeathScreen();
+    } else {
+      startGame();
+    }
+  } else {
+    showScreen('naming');
+  }
+
+  // Allow Enter key to submit name
+  document.getElementById('name-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') createPet();
+  });
+}
+
+init();
+</script>
+</body>
+</html>
