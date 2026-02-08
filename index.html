@@ -258,6 +258,47 @@
   .anim-play { animation: bounce 0.375s ease-in-out 4; }
   .anim-sleep { animation: sleepSink 2s ease-in-out forwards; }
 
+  /* Evolution event */
+  @keyframes evolveFlash {
+    0%, 100% { opacity: 0; }
+    10%, 90% { opacity: 1; }
+  }
+
+  @keyframes evolvePulse {
+    0%, 100% { transform: scale(1); text-shadow: 0 0 10px rgba(51, 255, 51, 0.8); }
+    50% { transform: scale(1.1); text-shadow: 0 0 20px rgba(51, 255, 51, 1); }
+  }
+
+  .evolve-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(51, 255, 51, 0.15);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    animation: evolveFlash 3s ease-in-out forwards;
+    pointer-events: none;
+  }
+
+  .evolve-text {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 18px;
+    color: #33ff33;
+    letter-spacing: 4px;
+    animation: evolvePulse 0.5s ease-in-out 6;
+    text-shadow: 0 0 10px rgba(51, 255, 51, 0.8);
+  }
+
+  .evolve-stage {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    color: #66ff66;
+    margin-top: 8px;
+    letter-spacing: 2px;
+  }
+
   /* Floating food pixel */
   @keyframes foodDrop {
     0% { transform: translateY(-60px); opacity: 1; }
@@ -441,6 +482,52 @@
     padding: 8px 0 0 0;
   }
 
+  .btn-kill {
+    border-color: #660000;
+    color: #ff3333;
+    text-shadow: 0 0 5px rgba(255, 51, 51, 0.5);
+  }
+  .btn-kill:hover {
+    background: rgba(255, 0, 0, 0.15);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.3), inset 0 0 10px rgba(255, 0, 0, 0.1);
+  }
+
+  .kill-confirm {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 30;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .kill-confirm-box {
+    text-align: center;
+    padding: 20px;
+  }
+
+  .kill-confirm-title {
+    font-size: 20px;
+    color: #ff3333;
+    letter-spacing: 4px;
+    text-shadow: 0 0 10px rgba(255, 51, 51, 0.5);
+    margin-bottom: 12px;
+  }
+
+  .kill-confirm-msg {
+    font-size: 12px;
+    color: #993333;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .kill-confirm-btns {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
   /* Leaderboard Overlay */
   #leaderboard-overlay {
     position: absolute;
@@ -600,6 +687,15 @@
 
       <div class="stats-panel screen-section">
         <div class="stat-row">
+          <span class="stat-label">HP</span>
+          <div class="stat-bar-container">
+            <span>[</span>
+            <div class="stat-bar" id="bar-health"></div>
+            <span>]</span>
+          </div>
+          <span class="stat-value" id="val-health"></span>
+        </div>
+        <div class="stat-row">
           <span class="stat-label">HNG</span>
           <div class="stat-bar-container">
             <span>[</span>
@@ -607,24 +703,6 @@
             <span>]</span>
           </div>
           <span class="stat-value" id="val-hunger"></span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">HPY</span>
-          <div class="stat-bar-container">
-            <span>[</span>
-            <div class="stat-bar" id="bar-happiness"></div>
-            <span>]</span>
-          </div>
-          <span class="stat-value" id="val-happiness"></span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">HLT</span>
-          <div class="stat-bar-container">
-            <span>[</span>
-            <div class="stat-bar" id="bar-health"></div>
-            <span>]</span>
-          </div>
-          <span class="stat-value" id="val-health"></span>
         </div>
         <div class="stat-row">
           <span class="stat-label">NRG</span>
@@ -635,6 +713,15 @@
           </div>
           <span class="stat-value" id="val-energy"></span>
         </div>
+        <div class="stat-row">
+          <span class="stat-label">HPY</span>
+          <div class="stat-bar-container">
+            <span>[</span>
+            <div class="stat-bar" id="bar-happiness"></div>
+            <span>]</span>
+          </div>
+          <span class="stat-value" id="val-happiness"></span>
+        </div>
       </div>
 
       <div class="actions-panel">
@@ -644,6 +731,21 @@
       </div>
       <div class="leaderboard-btn-row">
         <button class="btn" onclick="openLeaderboard()">[ LEADERBOARD ]</button>
+      </div>
+      <div class="leaderboard-btn-row">
+        <button class="btn btn-kill" onclick="confirmKill()">[ TERMINATE ]</button>
+      </div>
+
+      <!-- Kill confirmation overlay -->
+      <div id="kill-confirm" class="kill-confirm hidden">
+        <div class="kill-confirm-box">
+          <div class="kill-confirm-title">WARNING</div>
+          <div class="kill-confirm-msg">This will permanently terminate your pet.<br>This action is irreversible.</div>
+          <div class="kill-confirm-btns">
+            <button class="btn btn-kill" onclick="executeKill()">[ CONFIRM ]</button>
+            <button class="btn" onclick="cancelKill()">[ CANCEL ]</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -695,7 +797,7 @@ const FIREBASE_CONFIG = {
   appId: "1:1004332017761:web:33bf7faa0659e4f11fa220"
 };
 const DECAY_INTERVAL = 30000;        // 30s between stat ticks while open
-const AWAY_DECAY_RATE = 1 / 300;     // 1 point per 5 min (300s) while away
+const AWAY_DECAY_RATE = 1 / 1200;     // 1 point per 20 min (1200s) while away
 const AWAY_STAT_FLOOR = 10;          // stats won't go below this from away-decay
 const AUTOSAVE_INTERVAL = 10000;     // save every 10s
 const PIXEL_SIZE = 6;                // size of each pixel in sprites
@@ -704,7 +806,7 @@ const COOLDOWNS = { feed: 15000, play: 5000, sleep: 50000 };
 
 const ACTION_EFFECTS = {
   feed:  { hunger: 20, happiness: 5,  health: 5,  energy: 5,  weight: 0.5 },
-  play:  { hunger: -10, happiness: 25, health: -5, energy: -15, weight: -0.1 },
+  play:  { hunger: -10, happiness: 25, health: -5, energy: -15, weight: -0.2 },
   sleep: { hunger: -5,  happiness: 5,  health: 15, energy: 30,  weight: 0.1 }
 };
 
@@ -932,6 +1034,7 @@ let decayTimer = null;
 let saveTimer = null;
 let spriteFrame = 0;
 let spriteTimer = null;
+let lastStage = null;
 let cooldowns = { feed: 0, play: 0, sleep: 0 };
 let cooldownTimers = {};
 let audioCtx = null;
@@ -1054,6 +1157,7 @@ function createPet() {
 
 function startGame() {
   applyAwayDecay();
+  lastStage = getStage();
   showScreen('game');
   updateDisplay();
   startSprite();
@@ -1262,6 +1366,27 @@ function getDaysAlive() {
   return Math.floor((Date.now() - pet.createdAt) / (1000 * 60 * 60 * 24));
 }
 
+function confirmKill() {
+  if (!pet || getStatus() === 'DEAD') return;
+  document.getElementById('kill-confirm').classList.remove('hidden');
+  document.getElementById('kill-confirm').style.display = 'flex';
+}
+
+function cancelKill() {
+  document.getElementById('kill-confirm').classList.add('hidden');
+  document.getElementById('kill-confirm').style.display = 'none';
+}
+
+function executeKill() {
+  cancelKill();
+  pet.stats.hunger = 0;
+  pet.stats.happiness = 0;
+  pet.stats.health = 0;
+  pet.stats.energy = 0;
+  updateDisplay();
+  checkDeath();
+}
+
 function checkDeath() {
   if (getStatus() === 'DEAD') {
     clearInterval(decayTimer);
@@ -1307,9 +1432,16 @@ function showScreen(screen) {
 function updateDisplay() {
   if (!pet) return;
 
+  // Check for evolution
+  const currentStage = getStage();
+  if (lastStage && currentStage !== lastStage && getStatus() !== 'DEAD') {
+    showEvolution(currentStage);
+  }
+  lastStage = currentStage;
+
   // Info panel
   document.getElementById('pet-name-line').textContent = `${pet.name} the ${pet.type.toUpperCase()}`;
-  document.getElementById('stage-display').textContent = `Stage: ${getStage()}`;
+  document.getElementById('stage-display').textContent = `Stage: ${currentStage}`;
   document.getElementById('day-display').textContent = `Day: ${getDaysAlive()}`;
   document.getElementById('weight-display').textContent = `Weight: ${pet.weight.toFixed(1)}g`;
   document.getElementById('type-display').textContent = `Type: ${pet.type.toUpperCase()}`;
@@ -1327,6 +1459,15 @@ function updateDisplay() {
 
   // Update sprite
   renderSprite();
+}
+
+function showEvolution(newStage) {
+  const area = document.getElementById('pet-area');
+  const overlay = document.createElement('div');
+  overlay.className = 'evolve-overlay';
+  overlay.innerHTML = `<div class="evolve-text">EVOLVED!</div><div class="evolve-stage">${pet.name} is now ${newStage}</div>`;
+  area.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 3000);
 }
 
 function updateStatBar(stat, value) {
