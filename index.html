@@ -226,6 +226,7 @@
     min-height: 200px;
     position: relative;
     overflow: hidden;
+    cursor: pointer;
   }
 
   #pet-sprite {
@@ -1146,6 +1147,59 @@ function triggerAnimation(action) {
   }
 }
 
+let petClickAnim = null;
+
+function onPetClicked(e) {
+  if (!pet || getStatus() === 'DEAD') return;
+  const sprite = document.getElementById('pet-sprite');
+  const area = document.getElementById('pet-area');
+  if (petClickAnim) return;
+
+  // Calculate click position relative to sprite's resting center
+  const areaRect = area.getBoundingClientRect();
+  const spriteRect = sprite.getBoundingClientRect();
+  const spriteCenterX = spriteRect.left + spriteRect.width / 2 - areaRect.left;
+  const spriteCenterY = spriteRect.top + spriteRect.height / 2 - areaRect.top;
+  const clickX = e.clientX - areaRect.left;
+  const clickY = e.clientY - areaRect.top;
+  const tx = clickX - spriteCenterX;
+  const ty = clickY - spriteCenterY;
+
+  // Perpendicular direction for zigzag
+  const dist = Math.sqrt(tx * tx + ty * ty) || 1;
+  const px = -ty / dist;
+  const py = tx / dist;
+  const wobble = Math.min(20, dist * 0.3);
+
+  // Build zigzag keyframes: start → zigzag to target → zigzag back
+  const steps = 8;
+  const keyframes = [{ transform: 'translate(0px, 0px) rotate(0deg)' }];
+  for (let i = 1; i <= steps; i++) {
+    const progress = i / steps;
+    const x = tx * progress;
+    const y = ty * progress;
+    const side = (i % 2 === 0 ? 1 : -1) * wobble * (1 - progress * 0.5);
+    const rot = side > 0 ? 4 : -4;
+    keyframes.push({ transform: `translate(${x + px * side}px, ${y + py * side}px) rotate(${rot}deg)` });
+  }
+  for (let i = steps - 1; i >= 0; i--) {
+    const progress = i / steps;
+    const x = tx * progress;
+    const y = ty * progress;
+    const side = (i % 2 === 0 ? -1 : 1) * wobble * (1 - progress * 0.5);
+    const rot = side > 0 ? 4 : -4;
+    keyframes.push({ transform: `translate(${x + px * side}px, ${y + py * side}px) rotate(${rot}deg)` });
+  }
+  keyframes.push({ transform: 'translate(0px, 0px) rotate(0deg)' });
+
+  sprite.classList.remove('idle-anim');
+  petClickAnim = sprite.animate(keyframes, { duration: 1500, easing: 'ease-in-out' });
+  petClickAnim.onfinish = () => {
+    petClickAnim = null;
+    sprite.classList.add('idle-anim');
+  };
+}
+
 function startCooldown(action) {
   const duration = COOLDOWNS[action];
   cooldowns[action] = duration;
@@ -1579,6 +1633,9 @@ function init() {
   document.getElementById('name-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') createPet();
   });
+
+  // Click pet to make it wander and jiggle
+  document.getElementById('pet-area').addEventListener('click', onPetClicked);
 }
 
 init();
