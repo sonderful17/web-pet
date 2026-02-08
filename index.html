@@ -571,9 +571,9 @@
     <div id="naming-screen">
       <div class="prompt">
         INITIALISING NEW PET UNIT...<br><br>
-        ENTER DESIGNATION:<span class="cursor">_</span>
+        ENTER DESIGNATION:
       </div>
-      <input type="text" id="name-input" placeholder="NAME" maxlength="12" autocomplete="off" spellcheck="false">
+      <input type="text" id="name-input" placeholder="NAME YOUR PET" maxlength="12" autocomplete="off" spellcheck="false">
       <button class="btn" id="name-submit" onclick="createPet()">[ ACTIVATE ]</button>
     </div>
 
@@ -698,11 +698,11 @@ const AWAY_STAT_FLOOR = 10;          // stats won't go below this from away-deca
 const AUTOSAVE_INTERVAL = 10000;     // save every 10s
 const PIXEL_SIZE = 6;                // size of each pixel in sprites
 
-const COOLDOWNS = { feed: 15000, play: 25000, sleep: 50000 };
+const COOLDOWNS = { feed: 15000, play: 5000, sleep: 50000 };
 
 const ACTION_EFFECTS = {
   feed:  { hunger: 20, happiness: 5,  health: 5,  energy: 5,  weight: 0.5 },
-  play:  { hunger: -10, happiness: 25, health: 10, energy: -15, weight: -0.3 },
+  play:  { hunger: -10, happiness: 25, health: -5, energy: -15, weight: -0.1 },
   sleep: { hunger: -5,  happiness: 5,  health: 15, energy: 30,  weight: 0.1 }
 };
 
@@ -1176,7 +1176,7 @@ function startCooldown(action) {
 
 function getStatus() {
   if (!pet) return 'DEAD';
-  const avg = (pet.stats.hunger + pet.stats.happiness + pet.stats.health + pet.stats.energy) / 4;
+  const avg = (pet.stats.hunger + pet.stats.health + pet.stats.energy) / 3;
   for (const t of STATUS_THRESHOLDS) {
     if (avg >= t.min) return t.label;
   }
