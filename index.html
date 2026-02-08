@@ -935,6 +935,7 @@ let cooldownTimers = {};
 let audioCtx = null;
 let db = null;
 let authUser = null;
+let livePetSyncTimer = null;
 
 // ============================================================
 // AUDIO - Web Audio API sound effects
@@ -1017,11 +1018,13 @@ function loadPet() {
 }
 
 function resetPet() {
+  removeLivePet();
   localStorage.removeItem(SAVE_KEY);
   pet = null;
   clearInterval(decayTimer);
   clearInterval(saveTimer);
   clearInterval(spriteTimer);
+  clearInterval(livePetSyncTimer);
   Object.values(cooldownTimers).forEach(clearInterval);
   showScreen('naming');
 }
@@ -1064,6 +1067,10 @@ function startGame() {
   }, DECAY_INTERVAL);
 
   saveTimer = setInterval(savePet, AUTOSAVE_INTERVAL);
+
+  // Sync live pet to Firestore every 60s (and immediately)
+  syncLivePet();
+  livePetSyncTimer = setInterval(syncLivePet, 60000);
 }
 
 function applyAwayDecay() {
@@ -1205,6 +1212,8 @@ function checkDeath() {
     clearInterval(decayTimer);
     clearInterval(saveTimer);
     clearInterval(spriteTimer);
+    clearInterval(livePetSyncTimer);
+    removeLivePet();
     if (!pet.leaderboardSaved) {
       saveToLeaderboard(pet);
       pet.leaderboardSaved = true;
@@ -1426,37 +1435,44 @@ async function renderLeaderboard(sortBy) {
   list.innerHTML = '<div class="lb-empty">LOADING...</div>';
 
   let entries = [];
+  let source = 'local';
 
-  // Try Firestore first, fall back to localStorage
   try {
     if (db) {
+      source = 'online';
       const field = sortBy === 'weight' ? 'weight' : 'days';
-      const snapshot = await db.collection('leaderboard')
-        .orderBy(field, 'desc')
-        .limit(8)
-        .get();
-      entries = snapshot.docs.map(doc => ({ ...doc.data(), alive: false }));
+
+      // Fetch live pets and dead pets in parallel
+      const [liveSnapshot, deadSnapshot] = await Promise.all([
+        db.collection('livePets').orderBy(field, 'desc').limit(8).get(),
+        db.collection('leaderboard').orderBy(field, 'desc').limit(8).get()
+      ]);
+
+      const liveEntries = liveSnapshot.docs.map(doc => ({ ...doc.data(), alive: true }));
+      const deadEntries = deadSnapshot.docs.map(doc => ({ ...doc.data(), alive: false }));
+      entries = [...liveEntries, ...deadEntries];
     } else {
+      // Offline: use localStorage + local live pet
       entries = loadLeaderboard().map(e => ({ ...e, alive: false }));
+      if (pet && getStatus() !== 'DEAD') {
+        entries.push({
+          name: pet.name, type: pet.type, days: getDaysAlive(),
+          weight: pet.weight, stage: getStage(), alive: true
+        });
+      }
     }
   } catch (err) {
     console.warn('Firestore fetch failed, using local data:', err);
     entries = loadLeaderboard().map(e => ({ ...e, alive: false }));
+    if (pet && getStatus() !== 'DEAD') {
+      entries.push({
+        name: pet.name, type: pet.type, days: getDaysAlive(),
+        weight: pet.weight, stage: getStage(), alive: true
+      });
+    }
   }
 
-  // Include current live pet if it exists and isn't dead
-  if (pet && getStatus() !== 'DEAD') {
-    entries.push({
-      name: pet.name,
-      type: pet.type,
-      days: getDaysAlive(),
-      weight: pet.weight,
-      stage: getStage(),
-      alive: true
-    });
-  }
-
-  // Sort (re-sort after merging live pet)
+  // Sort
   if (sortBy === 'weight') {
     entries.sort((a, b) => b.weight - a.weight);
   } else {
@@ -1495,6 +1511,31 @@ async function renderLeaderboard(sortBy) {
 }
 
 // ============================================================
+// LIVE PET SYNC
+// ============================================================
+function syncLivePet() {
+  if (!db || !authUser || !pet || getStatus() === 'DEAD') return;
+  db.collection('livePets').doc(authUser.uid).set({
+    name: pet.name,
+    type: pet.type,
+    days: getDaysAlive(),
+    weight: pet.weight,
+    stage: getStage(),
+    uid: authUser.uid,
+    lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(err => {
+    console.warn('Failed to sync live pet:', err);
+  });
+}
+
+function removeLivePet() {
+  if (!db || !authUser) return;
+  db.collection('livePets').doc(authUser.uid).delete().catch(err => {
+    console.warn('Failed to remove live pet:', err);
+  });
+}
+
+// ============================================================
 // FIREBASE
 // ============================================================
 function initFirebase() {
@@ -1504,6 +1545,8 @@ function initFirebase() {
     db = firebase.firestore();
     firebase.auth().signInAnonymously().then(cred => {
       authUser = cred.user;
+      // Sync live pet now that auth is ready
+      syncLivePet();
     }).catch(err => {
       console.warn('Anonymous auth failed:', err);
     });
