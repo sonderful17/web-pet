@@ -894,16 +894,16 @@ const RANDOM_EVENT_MAX_DELAY = 60000;  // latest: 1min
 
 const RANDOM_EVENTS = [
   // Positive events
-  { name: 'CRASHED A WEDDING',       msg: 'ate, drank and was merry!',        weight: 3, effects: { hunger: 30, happiness: 20, health: 10, energy: -5 },   weightDelta: 15.0 },
+  { name: 'CRASHED A WEDDING',       msg: 'ate, drank and was merry!',        weight: 2, effects: { hunger: 30, happiness: 20, health: 10, energy: -5 },   weightDelta: 15.0 },
   { name: 'GOOD DREAM',        msg: 'had a wonderful dream!',              weight: 3, effects: { hunger: 20, happiness: 25, health: 15, energy: 20 },   weightDelta: 0 },
   { name: 'SUNSHINE',           msg: 'basked in warm sunshine!',            weight: 3, effects: { hunger: -25, happiness: 30, health: 20, energy: -15 }, weightDelta: 0 },
-  { name: 'GROWTH SPURT',      msg: 'had a growth spurt!',                 weight: 3, effects: { hunger: -25, happiness: 5, health: 0, energy: -20 }, weightDelta: 32.0 },
+  { name: 'GROWTH SPURT',      msg: 'had a growth spurt!',                 weight: 2, effects: { hunger: -25, happiness: 5, health: 0, energy: -20 }, weightDelta: 32.0 },
   { name: 'MADE A FRIEND',     msg: 'made a new friend!',                  weight: 3, effects: { hunger: 0, happiness: 30, health: 15, energy: -5 },   weightDelta: 0 },
   // Negative events
   { name: 'BAD FOOD',          msg: 'ate something bad!',                  weight: 3, effects: { hunger: 20, happiness: -30, health: -20, energy: -25 }, weightDelta: -10.5 },
   { name: 'NIGHTMARE',         msg: 'had a terrible nightmare!',           weight: 3, effects: { hunger: 0, happiness: -30, health: -5, energy: -15 }, weightDelta: 0 },
   { name: 'GOT LOST',          msg: 'got lost and wandered around!',       weight: 2, effects: { hunger: -15, happiness: -15, health: -5, energy: -20 }, weightDelta: -1.0 },
-  { name: 'COLD SNAP',         msg: 'caught a chill!',                     weight: 2, effects: { hunger: -10, happiness: -10, health: -15, energy: -10 }, weightDelta: -10.0 },
+  { name: 'COLD SNAP',         msg: 'caught a chill!',                     weight: 3, effects: { hunger: -10, happiness: -10, health: -15, energy: -10 }, weightDelta: -10.0 },
   { name: 'PARASITE',          msg: 'picked up a parasite!',               weight: 1, effects: { hunger: -20, happiness: -15, health: -35, energy: -10 }, weightDelta: -20.0 },
   // Fatal events (rare)
   { name: 'LIGHTNING STRIKE',  msg: 'was struck by lightning!',            weight: 0.5, effects: {}, fatal: true },
