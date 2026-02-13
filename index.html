@@ -908,7 +908,7 @@ const RANDOM_EVENTS = [
   // Fatal events (rare)
   { name: 'LIGHTNING STRIKE',  msg: 'was struck by lightning!',            weight: 0.5, effects: {}, fatal: true },
   { name: 'EATEN BY PREDATOR', msg: 'was eaten by a predator!',           weight: 0.5, effects: {}, fatal: true },
-  { name: 'FELL OFF A CLIFF',  msg: 'fell off a cliff!',                  weight: 1, effects: { hunger: -80, happiness: -100, health: -80, energy: -80 },
+  { name: 'FELL OFF A CLIFF',  msg: 'fell off a cliff!',                  weight: 1, effects: { hunger: -80, happiness: -100, health: -80, energy: -80 }, weightDelta: -5.0 },
 ];
 
 const STATUS_THRESHOLDS = [
