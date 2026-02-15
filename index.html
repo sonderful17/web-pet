@@ -317,7 +317,7 @@
   .event-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(51, 255, 51, 0.1);
+    background: rgba(0, 0, 0, 0.75);
     z-index: 20;
     display: flex;
     flex-direction: column;
@@ -328,7 +328,7 @@
   }
 
   .event-overlay.event-fatal {
-    background: rgba(255, 0, 0, 0.2);
+    background: rgba(40, 0, 0, 0.8);
     animation: eventFlash 3.5s ease-in-out forwards, eventShake 0.5s ease-in-out 3;
   }
 
@@ -1241,6 +1241,7 @@ let db = null;
 let authUser = null;
 let livePetSyncTimer = null;
 let randomEventTimer = null;
+let eventOverlayActive = false;
 
 // ============================================================
 // AUDIO - Web Audio API sound effects
@@ -1730,7 +1731,11 @@ function showRandomEvent(evt, fatal) {
   }
 
   area.appendChild(overlay);
-  setTimeout(() => overlay.remove(), 3500);
+  eventOverlayActive = true;
+  setTimeout(() => {
+    overlay.remove();
+    eventOverlayActive = false;
+  }, 3500);
 }
 
 // ============================================================
@@ -1758,10 +1763,20 @@ function showScreen(screen) {
 function updateDisplay() {
   if (!pet) return;
 
-  // Check for evolution
+  // Check for evolution (defer if a random event overlay is showing)
   const currentStage = getStage();
   if (lastStage && currentStage !== lastStage && getStatus() !== 'DEAD') {
-    showEvolution(currentStage);
+    if (eventOverlayActive) {
+      const pending = currentStage;
+      const waitForEvent = setInterval(() => {
+        if (!eventOverlayActive) {
+          clearInterval(waitForEvent);
+          showEvolution(pending);
+        }
+      }, 200);
+    } else {
+      showEvolution(currentStage);
+    }
   }
   lastStage = currentStage;
 
