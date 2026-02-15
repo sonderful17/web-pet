@@ -305,15 +305,6 @@
     8%, 85% { opacity: 1; }
   }
 
-  @keyframes eventShake {
-    0%, 100% { transform: translateX(0); }
-    15% { transform: translateX(-3px); }
-    30% { transform: translateX(3px); }
-    45% { transform: translateX(-2px); }
-    60% { transform: translateX(2px); }
-    75% { transform: translateX(0); }
-  }
-
   .event-overlay {
     position: absolute;
     inset: 0;
@@ -327,22 +318,12 @@
     pointer-events: none;
   }
 
-  .event-overlay.event-fatal {
-    background: rgba(40, 0, 0, 0.8);
-    animation: eventFlash 3.5s ease-in-out forwards, eventShake 0.5s ease-in-out 3;
-  }
-
   .event-title {
     font-family: 'Courier New', Courier, monospace;
     font-size: 16px;
     color: #33ff33;
     letter-spacing: 3px;
     text-shadow: 0 0 10px rgba(51, 255, 51, 0.8);
-  }
-
-  .event-fatal .event-title {
-    color: #ff3333;
-    text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
   }
 
   .event-msg {
@@ -353,10 +334,6 @@
     letter-spacing: 1px;
     text-align: center;
     padding: 0 10px;
-  }
-
-  .event-fatal .event-msg {
-    color: #ff6666;
   }
 
   /* Friend sprite for MADE A FRIEND event */
@@ -888,7 +865,7 @@ const ACTION_EFFECTS = {
 
 // Random events: fires at random intervals between min and max ms
 // Each event has a weight (relative probability), stat effects, weight effect,
-// and an optional `fatal` flag that instantly kills the pet.
+// and an optional weight delta that adjusts the pet's weight.
 const RANDOM_EVENT_MIN_DELAY = 10000;  // earliest: 10s
 const RANDOM_EVENT_MAX_DELAY = 60000;  // latest: 1min
 
@@ -905,9 +882,9 @@ const RANDOM_EVENTS = [
   { name: 'GOT LOST',          msg: 'got lost and wandered around!',       weight: 2, effects: { hunger: -15, happiness: -15, health: -5, energy: -20 }, weightDelta: 0 },
   { name: 'COLD SNAP',         msg: 'caught a chill!',                     weight: 3, effects: { hunger: -10, happiness: -10, health: -15, energy: -10 }, weightDelta: 0 },
   { name: 'PARASITE',          msg: 'picked up a parasite!',               weight: 1, effects: { hunger: -20, happiness: -15, health: -35, energy: -10 }, weightDelta: -2.0 },
-  // Fatal events (rare)
+  // Catastrophic events (rare)
   { name: 'LIGHTNING STRIKE',  msg: 'was struck by lightning!',            weight: 0.5, effects: { hunger: 0, happiness: -100, health: -80, energy: -80 }, weightDelta: -5.0 },
-  { name: 'EATEN BY PREDATOR', msg: 'was eaten by a predator!',           weight: 0.5, effects: {}, fatal: true },
+  { name: 'ATTACKED BY WILD ANIMALS', msg: 'was attacked by wild animals!', weight: 0.5, effects: { hunger: 0, happiness: -100, health: -80, energy: -80 }, weightDelta: -5.0 },
   { name: 'FELL OFF A CLIFF',  msg: 'fell off a cliff!',                  weight: 1, effects: { hunger: 0, happiness: -100, health: -80, energy: -80 }, weightDelta: -5.0 },
 ];
 
@@ -1306,36 +1283,20 @@ function playSleepSound() {
   osc.stop(ctx.currentTime + 1.6);
 }
 
-function playEventSound(fatal) {
+function playEventSound() {
   const ctx = getAudioCtx();
-  if (fatal) {
-    // Ominous descending buzz
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(300, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.8);
-    gain.gain.setValueAtTime(0.18, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.9);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 1.0);
-  } else {
-    // Short alert blip
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(440, ctx.currentTime);
-    osc.frequency.setValueAtTime(520, ctx.currentTime + 0.08);
-    osc.frequency.setValueAtTime(440, ctx.currentTime + 0.16);
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.25);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.3);
-  }
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(440, ctx.currentTime);
+  osc.frequency.setValueAtTime(520, ctx.currentTime + 0.08);
+  osc.frequency.setValueAtTime(440, ctx.currentTime + 0.16);
+  gain.gain.setValueAtTime(0.12, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.25);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.3);
 }
 
 const ACTION_SOUNDS = { feed: playFeedSound, play: playPlaySound, sleep: playSleepSound };
@@ -1672,20 +1633,6 @@ function triggerRandomEvent() {
 
   const evt = pickRandomEvent();
 
-  if (evt.fatal) {
-    showRandomEvent(evt, true);
-    // Delay death slightly so the player can read the message
-    setTimeout(() => {
-      pet.stats.hunger = 0;
-      pet.stats.happiness = 0;
-      pet.stats.health = 0;
-      pet.stats.energy = 0;
-      updateDisplay();
-      checkDeath();
-    }, 1500);
-    return;
-  }
-
   // Apply stat effects
   for (const [stat, delta] of Object.entries(evt.effects)) {
     if (pet.stats[stat] !== undefined) {
@@ -1698,18 +1645,18 @@ function triggerRandomEvent() {
     pet.weight = Math.max(1, Math.round((pet.weight + evt.weightDelta) * 10) / 10);
   }
 
-  showRandomEvent(evt, false);
+  showRandomEvent(evt);
   savePet();
   updateDisplay();
   checkDeath();
 }
 
-function showRandomEvent(evt, fatal) {
-  playEventSound(fatal);
+function showRandomEvent(evt) {
+  playEventSound();
   const area = document.getElementById('pet-area');
   const overlay = document.createElement('div');
-  overlay.className = 'event-overlay' + (fatal ? ' event-fatal' : '');
-  overlay.innerHTML = `<div class="event-title">${fatal ? '!! ' : ''}${evt.name}${fatal ? ' !!' : ''}</div><div class="event-msg">${pet.name} ${evt.msg}</div>`;
+  overlay.className = 'event-overlay';
+  overlay.innerHTML = `<div class="event-title">${evt.name}</div><div class="event-msg">${pet.name} ${evt.msg}</div>`;
 
   // For MADE A FRIEND, render a friend sprite walking the opposite direction
   if (evt.name === 'MADE A FRIEND') {
